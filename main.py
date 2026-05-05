@@ -1,126 +1,134 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import random
 import json
+from datetime import datetime
 
-MOVIES_FILE = 'movies.json'
+HISTORY_FILE = 'tasks_history.json'
 
-def load_movies():
-    try:
-        with open(MOVIES_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
+class RandomTaskGenerator:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Random Task Generator")
+        self.root.geometry("650x500")
 
-def save_movies(data):
-    with open(MOVIES_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        # Предопределенный список задач
+        self.all_tasks = [
+            {"task": "Прочитать статью по криптографии", "type": "Учёба"},
+            {"task": "Сделать 20 приседаний", "type": "Спорт"},
+            {"task": "Написать отчет по практике", "type": "Работа"},
+            {"task": "Изучить новый алгоритм шифрования", "type": "Учёба"},
+            {"task": "Размять шею и спину", "type": "Спорт"},
+            {"task": "Проверить электронную почту", "type": "Работа"}
+        ]
+        
+        self.history = self.load_history()
+        self.setup_ui()
 
-def validate_input():
-    title = entry_title.get().strip()
-    genre = entry_genre.get().strip()
-    year = entry_year.get().strip()
-    rating = entry_rating.get().strip()
+    def setup_ui(self):
+        # --- Панель генерации задач ---
+        frame_gen = ttk.LabelFrame(self.root, text="Генератор", padding=10)
+        frame_gen.pack(padx=10, pady=10, fill="x")
 
-    if not title or not genre:
-        messagebox.showerror("Ошибка", "Название и жанр не должны быть пустыми.")
-        return False
+        ttk.Label(frame_gen, text="Выберите тип:").grid(row=0, column=0, padx=5, pady=5)
+        self.combo_type = ttk.Combobox(frame_gen, values=["Все", "Учёба", "Спорт", "Работа"], state="readonly")
+        self.combo_type.set("Все")
+        self.combo_type.grid(row=0, column=1, padx=5, pady=5)
 
-    if not year.isdigit() or not (1800 <= int(year) <= 2100):
-        messagebox.showerror("Ошибка", "Год должен быть числом от 1800 до 2100.")
-        return False
+        self.btn_generate = ttk.Button(frame_gen, text="Сгенерировать задачу", command=self.generate_task)
+        self.btn_generate.grid(row=0, column=2, padx=15, pady=5)
 
-    if not (rating.replace('.', '', 1).isdigit() and 0 <= float(rating) <= 10):
-        messagebox.showerror("Ошибка", "Рейтинг должен быть числом от 0 до 10.")
-        return False
+        # Вывод сгенерированной задачи
+        self.lbl_result = ttk.Label(self.root, text="Нажмите кнопку, чтобы получить задачу", font=("Arial", 12, "bold"))
+        self.lbl_result.pack(pady=10)
 
-    return True
+        # --- Панель добавления новых задач ---
+        frame_add = ttk.LabelFrame(self.root, text="Добавить новую задачу", padding=10)
+        frame_add.pack(padx=10, pady=5, fill="x")
 
-def add_movie():
-    if validate_input():
-        movie = {
-            "title": entry_title.get(),
-            "genre": entry_genre.get(),
-            "year": int(entry_year.get()),
-            "rating": float(entry_rating.get())
+        ttk.Label(frame_add, text="Название:").grid(row=0, column=0, padx=5, pady=5)
+        self.entry_new_task = ttk.Entry(frame_add, width=30)
+        self.entry_new_task.grid(row=0, column=1, padx=5, pady=5)
+
+        ttk.Label(frame_add, text="Тип:").grid(row=0, column=2, padx=5, pady=5)
+        self.combo_new_type = ttk.Combobox(frame_add, values=["Учёба", "Спорт", "Работа"], state="readonly")
+        self.combo_new_type.set("Учёба")
+        self.combo_new_type.grid(row=0, column=3, padx=5, pady=5)
+
+        self.btn_add_task = ttk.Button(frame_add, text="Добавить", command=self.add_task)
+        self.btn_add_task.grid(row=0, column=4, padx=10, pady=5)
+
+        # --- История ---
+        frame_hist = ttk.LabelFrame(self.root, text="История сгенерированных задач", padding=10)
+        frame_hist.pack(padx=10, pady=10, fill="both", expand=True)
+
+        self.tree = ttk.Treeview(frame_hist, columns=("date", "task", "type"), show="headings")
+        self.tree.heading("date", text="Дата и время")
+        self.tree.heading("task", text="Задача")
+        self.tree.heading("type", text="Тип")
+        
+        self.tree.column("date", width=120, anchor="center")
+        self.tree.column("type", width=80, anchor="center")
+        
+        self.tree.pack(fill="both", expand=True)
+        self.refresh_table()
+
+    def generate_task(self):
+        selected_type = self.combo_type.get()
+        
+        if selected_type == "Все":
+            available_tasks = self.all_tasks
+        else:
+            available_tasks = [t for t in self.all_tasks if t["type"] == selected_type]
+
+        if not available_tasks:
+            messagebox.showwarning("Внимание", "Нет задач для выбранного типа!")
+            return
+
+        chosen_task = random.choice(available_tasks)
+        self.lbl_result.config(text=f"{chosen_task['type']}: {chosen_task['task']}")
+
+        # Добавление в историю
+        new_entry = {
+            "date": datetime.now().strftime("%d.%m.%Y %H:%M"),
+            "task": chosen_task["task"],
+            "type": chosen_task["type"]
         }
-        movies.append(movie)
-        save_movies(movies)
-        refresh_table()
-        clear_fields()
+        self.history.append(new_entry)
+        self.save_history()
+        self.refresh_table()
 
-def refresh_table(filter_genre=None, filter_year=None):
-    for item in tree.get_children():
-        tree.delete(item)
-    for movie in movies:
-        if filter_genre and movie["genre"].lower() != filter_genre.lower():
-            continue
-        if filter_year and movie["year"] != int(filter_year):
-            continue
-        tree.insert("", "end", values=(movie["title"], movie["genre"], movie["year"], movie["rating"]))
+    def add_task(self):
+        new_task_text = self.entry_new_task.get().strip()
+        new_task_type = self.combo_new_type.get()
 
-def apply_filters():
-    genre = entry_filter_genre.get().strip() if entry_filter_genre.get().strip() else None
-    year = entry_filter_year.get().strip() if entry_filter_year.get().strip() else None
-    refresh_table(genre, year)
+        if not new_task_text:
+            messagebox.showwarning("Ошибка ввода", "Поле новой задачи не должно быть пустым!")
+            return
 
-def clear_fields():
-    entry_title.delete(0, tk.END)
-    entry_genre.delete(0, tk.END)
-    entry_year.delete(0, tk.END)
-    entry_rating.delete(0, tk.END)
+        self.all_tasks.append({"task": new_task_text, "type": new_task_type})
+        messagebox.showinfo("Успех", f"Задача '{new_task_text}' успешно добавлена!")
+        self.entry_new_task.delete(0, tk.END)
 
-movies = load_movies()
+    def load_history(self):
+        try:
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
 
-root = tk.Tk()
-root.title("Movie Library")
-root.geometry("800x500")
+    def save_history(self):
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(self.history, f, ensure_ascii=False, indent=2)
 
-tab_control = ttk.Notebook(root)
-tab_main = ttk.Frame(tab_control)
-tab_filter = ttk.Frame(tab_control)
-tab_control.add(tab_main, text="Добавить фильм")
-tab_control.add(tab_filter, text="Фильтр")
-tab_control.pack(expand=1, fill="both")
+    def refresh_table(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        for h in reversed(self.history):
+            self.tree.insert("", "end", values=(h['date'], h['task'], h['type']))
 
-# Вкладка "Добавить фильм"
-tk.Label(tab_main, text="Название:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-entry_title = tk.Entry(tab_main, width=40)
-entry_title.grid(row=0, column=1, padx=5, pady=5)
 
-tk.Label(tab_main, text="Жанр:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-entry_genre = tk.Entry(tab_main, width=40)
-entry_genre.grid(row=1, column=1, padx=5, pady=5)
-
-tk.Label(tab_main, text="Год выпуска:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
-entry_year = tk.Entry(tab_main, width=40)
-entry_year.grid(row=2, column=1, padx=5, pady=5)
-
-tk.Label(tab_main, text="Рейтинг (0-10):").grid(row=3, column=0, padx=5, pady=5, sticky="w")
-entry_rating = tk.Entry(tab_main, width=40)
-entry_rating.grid(row=3, column=1, padx=5, pady=5)
-
-btn_add = ttk.Button(tab_main, text="Добавить фильм", command=add_movie)
-btn_add.grid(row=4, column=0, columnspan=2, pady=10)
-
-tree = ttk.Treeview(tab_main, columns=("Название", "Жанр", "Год", "Рейтинг"), show="headings")
-for col in ("Название", "Жанр", "Год", "Рейтинг"):
-    tree.heading(col, text=col)
-tree.grid(row=5, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
-scrollbar = ttk.Scrollbar(tab_main, orient="vertical", command=tree.yview)
-scrollbar.grid(row=5, column=2, sticky="ns")
-tree.configure(yscrollcommand=scrollbar.set)
-
-# Вкладка "Фильтр"
-tk.Label(tab_filter, text="Жанр:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-entry_filter_genre = tk.Entry(tab_filter)
-entry_filter_genre.grid(row=0, column=1, padx=5, pady=5)
-
-tk.Label(tab_filter, text="Год выпуска:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-entry_filter_year = tk.Entry(tab_filter)
-entry_filter_year.grid(row=1, column=1, padx=5, pady=5)
-
-btn_apply = ttk.Button(tab_filter, text="Применить фильтр", command=apply_filters)
-btn_apply.grid(row=2, column=0, columnspan=2, pady=10)
-
-refresh_table()
-root.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = RandomTaskGenerator(root)
+    root.mainloop()
